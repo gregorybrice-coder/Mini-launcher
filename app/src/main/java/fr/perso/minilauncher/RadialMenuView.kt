@@ -46,6 +46,8 @@ class RadialMenuView(context: Context) : View(context) {
         fun openSettings()
         fun menuMarginRight(): Int
         fun menuMarginBottom(): Int
+        fun menuGap(): Int
+        fun appsGap(): Int
     }
 
     private enum class Mode { IDLE, GROUPS, APPS }
@@ -100,9 +102,9 @@ class RadialMenuView(context: Context) : View(context) {
         // les segments de groupes commencent au-delà du pouce : il reste dans la zone libre du centre,
         // loin des traits de séparation ; le menu s'agrandit en conséquence
         val thumbR = hypot(ox - bx, oy - by)
-        gIn = max(dp(80f), thumbR + dp(26f))
+        gIn = max(dp(80f), thumbR + dp((host?.menuGap() ?: 26).toFloat()))
         gOut = gIn + dp(100f)
-        rApps = (gIn + dp(52f)).coerceAtMost(height - dp(110f)) // les applis prennent la place des groupes
+        rApps = (gIn + dp((host?.appsGap() ?: 52).toFloat())).coerceAtMost(height - dp(110f)) // les applis prennent la place des groupes
         // l'arc des applis doit rester dans l'écran : on limite l'angle côté gauche
         val ratio = ((width - dp(36f)) / rApps).coerceIn(0.2f, 1f)
         val aMax = 180f - Math.toDegrees(Math.acos(ratio.toDouble())).toFloat()

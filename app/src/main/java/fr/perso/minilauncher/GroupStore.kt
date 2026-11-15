@@ -195,6 +195,36 @@ class GroupStore(ctx: Context) {
         get() = sp.getInt("menu_bottom", 200)
         set(v) { sp.edit().putInt("menu_bottom", v).apply() }
 
+    /** Écartement des segments de groupes par rapport au pouce (dp). */
+    var menuGap: Int
+        get() = sp.getInt("menu_gap", 26)
+        set(v) { sp.edit().putInt("menu_gap", v).apply() }
+
+    /** Distance entre la bande des groupes et l'arc des applis (dp). */
+    var appsGap: Int
+        get() = sp.getInt("apps_gap", 52)
+        set(v) { sp.edit().putInt("apps_gap", v).apply() }
+
+    var wallpaperStyle: Int
+        get() = sp.getInt("wall_style", 0)
+        set(v) { sp.edit().putInt("wall_style", v).apply() }
+
+    var wallpaperTint: Int
+        get() = sp.getInt("wall_tint", 0)
+        set(v) { sp.edit().putInt("wall_tint", v).apply() }
+
+    var widgetStorage: Boolean
+        get() = sp.getBoolean("w_storage", false)
+        set(v) { sp.edit().putBoolean("w_storage", v).apply() }
+
+    var widgetBattery: Boolean
+        get() = sp.getBoolean("w_battery", false)
+        set(v) { sp.edit().putBoolean("w_battery", v).apply() }
+
+    var widgetNotifs: Boolean
+        get() = sp.getBoolean("w_notifs", false)
+        set(v) { sp.edit().putBoolean("w_notifs", v).apply() }
+
     /** Demande de rejouer l'animation de démonstration à la prochaine arrivée sur l'accueil. */
     var replayDemo: Boolean
         get() = sp.getBoolean("replay_demo", false)

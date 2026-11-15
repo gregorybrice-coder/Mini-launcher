@@ -28,6 +28,7 @@ class SettingsActivity : Activity() {
     private val REQ_IMPORT = 42
 
     private lateinit var content: LinearLayout
+    private var preview: android.view.View? = null
 
     private fun dp(v: Float) = (v * resources.displayMetrics.density).toInt()
 
@@ -92,10 +93,61 @@ class SettingsActivity : Activity() {
             startActivityForResult(i, REQ_IMPORT)
         })
 
-        // --- position du menu ---
-        content.addView(title("POSITION DU MENU RADIAL (pour que le pouce reste détendu)"))
-        content.addView(slider("Distance au bord droit", 20, 260, store.menuMarginRight) { store.menuMarginRight = it })
-        content.addView(slider("Distance au bas de l'écran", 20, 400, store.menuMarginBottom) { store.menuMarginBottom = it })
+        // --- portée du pouce ---
+        content.addView(title("PORTÉE DU POUCE (adapte le menu à la taille de votre main)"))
+        val prev = ReachPreview(this)
+        preview = prev
+        content.addView(prev, LinearLayout.LayoutParams(-1, dp(250f)))
+        content.addView(slider("Bouton : distance au bord droit", 20, 260, store.menuMarginRight) { store.menuMarginRight = it; prev.invalidate() })
+        content.addView(slider("Bouton : distance au bas de l'écran", 20, 400, store.menuMarginBottom) { store.menuMarginBottom = it; prev.invalidate() })
+        content.addView(slider("Rayon des groupes (écart avec le pouce)", 0, 140, store.menuGap) { store.menuGap = it; prev.invalidate() })
+        content.addView(slider("Rayon des applis (écart avec les groupes)", 20, 140, store.appsGap) { store.appsGap = it; prev.invalidate() })
+
+        // --- fond d'écran ---
+        content.addView(title("FOND D'ÉCRAN (monochrome, sobre)"))
+        val sw = LinearLayout(this)
+        sw.orientation = LinearLayout.HORIZONTAL
+        for (i in WallpaperView.STYLE_NAMES.indices) {
+            val cell = LinearLayout(this)
+            cell.orientation = LinearLayout.VERTICAL
+            cell.gravity = Gravity.CENTER_HORIZONTAL
+            cell.setPadding(dp(4f), dp(4f), dp(4f), dp(4f))
+            cell.setBackgroundColor(if (store.wallpaperStyle == i) Color.parseColor("#7CC4FF") else Color.TRANSPARENT)
+            val v = WallpaperView(this)
+            v.set(i, store.wallpaperTint)
+            cell.addView(v, LinearLayout.LayoutParams(dp(62f), dp(108f)))
+            val n = TextView(this)
+            n.text = WallpaperView.STYLE_NAMES[i]
+            n.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            n.setTextColor(if (store.wallpaperStyle == i) Color.BLACK else Color.parseColor("#A0A0A0"))
+            cell.addView(n)
+            cell.setOnClickListener { store.wallpaperStyle = i; build() }
+            sw.addView(cell, LinearLayout.LayoutParams(-2, -2).also { it.rightMargin = dp(6f) })
+        }
+        val hs = android.widget.HorizontalScrollView(this)
+        hs.addView(sw)
+        content.addView(hs)
+        val tints = LinearLayout(this)
+        tints.orientation = LinearLayout.HORIZONTAL
+        tints.setPadding(0, dp(8f), 0, 0)
+        for (i in WallpaperView.TINTS.indices) {
+            val b = smallButton(WallpaperView.TINT_NAMES[i]) { store.wallpaperTint = i; build() }
+            if (store.wallpaperTint == i) {
+                b.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor(WallpaperView.TINTS[i].second))
+                b.setTextColor(Color.BLACK)
+            }
+            tints.addView(b, LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        content.addView(tints)
+
+        // --- widgets ---
+        content.addView(title("WIDGETS SOUS L'HEURE"))
+        content.addView(toggle("Espace de stockage restant", store.widgetStorage) { store.widgetStorage = it })
+        content.addView(toggle("Niveau de batterie", store.widgetBattery) { store.widgetBattery = it })
+        content.addView(toggle("Notifications en attente", store.widgetNotifs) { store.widgetNotifs = it })
+        content.addView(smallButton("Autoriser l'accès aux notifications (pour le compteur)") {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        })
 
         // --- groupes ---
         content.addView(title("GROUPES DU MENU RADIAL (${store.groups().size} sur ${GroupStore.MAX_GROUPS})"))
@@ -192,6 +244,7 @@ class SettingsActivity : Activity() {
         sb.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {
                 t.text = "$label : ${p + min}"
+                if (fromUser) onSet(p + min)
             }
             override fun onStartTrackingTouch(s: SeekBar?) {}
             override fun onStopTrackingTouch(s: SeekBar?) { onSet((s?.progress ?: 0) + min) }
@@ -286,5 +339,69 @@ class SettingsActivity : Activity() {
             box.addView(b, lp)
         }
         dialog.show()
+    }
+
+    /** Aperçu de l'écran : montre la zone de chaque rayon pour régler le menu à la portée du pouce. */
+    private inner class ReachPreview(ctx: android.content.Context) : View(ctx) {
+        private val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        private val r = android.graphics.RectF()
+        override fun onDraw(c: android.graphics.Canvas) {
+            val dm = resources.displayMetrics
+            val sw = dm.widthPixels / dm.density
+            val sh = dm.heightPixels / dm.density
+            val scale = minOf(width / sw, (height - dp(8f)) / sh)
+            val w = sw * scale
+            val h = sh * scale
+            val left = width - w - dp(4f)
+            val top = dp(4f)
+            val ox = left + w
+            val oy = top + h
+            p.style = android.graphics.Paint.Style.FILL
+            p.color = Color.parseColor("#0C0C0C")
+            c.drawRect(left, top, ox, oy, p)
+            p.style = android.graphics.Paint.Style.STROKE
+            p.strokeWidth = dp(1.5f)
+            p.color = Color.parseColor("#4A4A4A")
+            c.drawRect(left, top, ox, oy, p)
+
+            val mr = store.menuMarginRight.toFloat()
+            val mb = store.menuMarginBottom.toFloat()
+            val thumbR = Math.hypot(mr.toDouble(), mb.toDouble()).toFloat()
+            val gIn = maxOf(80f, thumbR + store.menuGap)
+            val gOut = gIn + 100f
+            val rApps = minOf(gIn + store.appsGap, sh - 110f)
+
+            // bande des groupes
+            val groups = store.groups()
+            val n = groups.size + 1
+            c.save()
+            c.clipRect(left, top, ox, oy)
+            p.style = android.graphics.Paint.Style.STROKE
+            p.strokeWidth = 100f * scale
+            val mid = (gIn + 50f) * scale
+            r.set(ox - mid, oy - mid, ox + mid, oy + mid)
+            for (i in 0 until n) {
+                p.color = if (i == groups.size) Color.parseColor("#9E9E9E") else store.colorOf(groups[i])
+                p.alpha = 150
+                c.drawArc(r, 180f + 90f / n * i, 90f / n - 1.5f, false, p)
+            }
+            // arc des applis
+            p.color = Color.WHITE
+            p.alpha = 160
+            p.strokeWidth = dp(1.2f)
+            val ra = rApps * scale
+            r.set(ox - ra, oy - ra, ox + ra, oy + ra)
+            c.drawArc(r, 180f, 90f, false, p)
+            p.style = android.graphics.Paint.Style.FILL
+            for (k in 0 until 5) {
+                val a = Math.toRadians((100.0 + (170.0 - 100.0) * k / 4))
+                c.drawCircle(ox + ra * Math.cos(a).toFloat(), oy - ra * Math.sin(a).toFloat(), dp(4f), p)
+            }
+            c.restore()
+            // pouce
+            p.color = Color.parseColor("#7CC4FF")
+            p.alpha = 255
+            c.drawCircle(ox - mr * scale, oy - mb * scale, dp(8f), p)
+        }
     }
 }

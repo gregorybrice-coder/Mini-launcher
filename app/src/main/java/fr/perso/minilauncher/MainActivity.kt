@@ -24,6 +24,11 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextClock
+import android.os.BatteryManager
+import android.os.Environment
+import android.os.StatFs
+import android.provider.Settings
+import java.util.Locale
 import android.widget.TextView
 
 class MainActivity : Activity(), RadialMenuView.Host {
@@ -39,6 +44,8 @@ class MainActivity : Activity(), RadialMenuView.Host {
 
     private lateinit var sounds: Sounds
     private lateinit var radial: RadialMenuView
+    private lateinit var wallpaper: WallpaperView
+    private lateinit var widgets: LinearLayout
     private lateinit var favorites: LinearLayout
     private lateinit var searchPanel: LinearLayout
     private lateinit var searchInput: EditText
@@ -67,6 +74,8 @@ class MainActivity : Activity(), RadialMenuView.Host {
 
         val root = FrameLayout(this)
         root.setBackgroundColor(Color.BLACK)
+        wallpaper = WallpaperView(this)
+        root.addView(wallpaper, FrameLayout.LayoutParams(-1, -1))
 
         // --- heure, date, favoris ---
         val column = LinearLayout(this)
@@ -104,6 +113,10 @@ class MainActivity : Activity(), RadialMenuView.Host {
 
         column.addView(clock)
         column.addView(date)
+
+        widgets = LinearLayout(this)
+        widgets.orientation = LinearLayout.VERTICAL
+        column.addView(widgets, LinearLayout.LayoutParams(-1, -2).also { it.topMargin = dpi(18f) })
         column.addView(favorites, favParams)
         root.addView(column, FrameLayout.LayoutParams(-1, -1))
 
@@ -197,6 +210,9 @@ class MainActivity : Activity(), RadialMenuView.Host {
             store.replayDemo = false
             radial.postDelayed({ radial.playDemo() }, 700)
         }
+        wallpaper.set(store.wallpaperStyle, store.wallpaperTint)
+        NotifService.onChange = { refreshWidgets() }
+        refreshWidgets()
         refreshFavorites()
     }
 
@@ -214,8 +230,65 @@ class MainActivity : Activity(), RadialMenuView.Host {
     override fun onDestroy() {
         unregisterReceiver(packageReceiver)
         repo.onChanged = null
+        NotifService.onChange = null
         sounds.release()
         super.onDestroy()
+    }
+
+    // ---------------------------------------------------------------- widgets
+
+    private fun notifAccessGranted(): Boolean {
+        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners") ?: return false
+        return flat.contains(packageName)
+    }
+
+    private fun widgetLine(label: String, value: String, fraction: Float?, onClick: (() -> Unit)? = null) {
+        val row = LinearLayout(this)
+        row.orientation = LinearLayout.VERTICAL
+        row.setPadding(0, dpi(4f), 0, dpi(4f))
+        val t = TextView(this)
+        t.text = "$label  ·  $value"
+        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        t.setTextColor(Color.parseColor("#B8B8B8"))
+        row.addView(t)
+        if (fraction != null) {
+            val bar = android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
+            bar.max = 1000
+            bar.progress = (fraction.coerceIn(0f, 1f) * 1000).toInt()
+            bar.progressTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#7CC4FF"))
+            bar.progressBackgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#2A2A2A"))
+            row.addView(bar, LinearLayout.LayoutParams(dpi(180f), dpi(4f)).also { it.topMargin = dpi(4f) })
+        }
+        if (onClick != null) row.setOnClickListener { onClick() }
+        widgets.addView(row)
+    }
+
+    private fun refreshWidgets() {
+        widgets.removeAllViews()
+        if (store.widgetStorage) {
+            val st = StatFs(Environment.getDataDirectory().path)
+            val free = st.availableBytes.toDouble()
+            val total = st.totalBytes.toDouble()
+            widgetLine("Stockage", String.format(Locale.getDefault(), "%.1f Go libres", free / 1e9), (1.0 - free / total).toFloat())
+        }
+        if (store.widgetBattery) {
+            val i = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            val lvl = i?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = i?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
+            val status = i?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+            val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
+            if (lvl >= 0) widgetLine("Batterie", "${lvl * 100 / scale} %" + if (charging) " (charge)" else "", lvl.toFloat() / scale)
+        }
+        if (store.widgetNotifs) {
+            if (notifAccessGranted()) {
+                val n = NotifService.count
+                widgetLine("Notifications", if (n == 0) "aucune en attente" else "$n en attente", null)
+            } else {
+                widgetLine("Notifications", "touchez pour autoriser l'accès", null) {
+                    startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                }
+            }
+        }
     }
 
     // ---------------------------------------------------------------- favoris
@@ -280,6 +353,8 @@ class MainActivity : Activity(), RadialMenuView.Host {
 
     override fun menuMarginRight(): Int = store.menuMarginRight
     override fun menuMarginBottom(): Int = store.menuMarginBottom
+    override fun menuGap(): Int = store.menuGap
+    override fun appsGap(): Int = store.appsGap
 
     override fun groupColor(group: String): Int = store.colorOf(group)
 
