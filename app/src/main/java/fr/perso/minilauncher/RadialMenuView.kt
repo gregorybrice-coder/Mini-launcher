@@ -165,6 +165,7 @@ class RadialMenuView(context: Context) : View(context) {
     private var offset = 0
     private var hoverSlot = 0
     private var armed = false
+    private var rRef = 0f // rayon de référence : on ouvre/ferme selon le mouvement vers l'extérieur/l'intérieur
     private var edgeDir = 0
     private var edgeOver = 0f
 
@@ -241,6 +242,7 @@ class RadialMenuView(context: Context) : View(context) {
         moved = false
         groupList = host?.groups() ?: emptyList()
         hoverGroup = -1
+        rRef = hypot(x - ox, y - oy)
         mode = Mode.GROUPS
         startOpenAnim()
         snd?.open()
@@ -260,13 +262,18 @@ class RadialMenuView(context: Context) : View(context) {
                 val h = segmentAt(th)
                 if (h != hoverGroup) {
                     hoverGroup = h
+                    rRef = r
                     snd?.tick()
                     haptic()
                 }
             }
-            if (r > gOut + dp(12f) && hoverGroup in groupList.indices) openGroup(hoverGroup, th)
+            rRef = min(rRef, r)
+            // glissement vers l'extérieur, où que soit le pouce sur l'écran : le groupe s'ouvre
+            if (moved && r - rRef > dp(38f) && hoverGroup in groupList.indices) openGroup(hoverGroup, th)
         } else if (mode == Mode.APPS) {
-            if (r < gOut - dp(16f)) closeGroup() else updateApps(th)
+            rRef = max(rRef, r)
+            // glissement vers l'intérieur : le groupe se referme
+            if (rRef - r > dp(42f)) closeGroup() else updateApps(th)
         }
         invalidate()
     }
@@ -281,6 +288,7 @@ class RadialMenuView(context: Context) : View(context) {
         hoverSlot = 0
         edgeDir = 0
         mode = Mode.APPS
+        rRef = hypot(thumbX - ox, thumbY - oy)
         startAppsAnim()
         snd?.open()
         haptic()
@@ -291,6 +299,7 @@ class RadialMenuView(context: Context) : View(context) {
         stopEdge()
         mode = Mode.GROUPS
         hoverGroup = openGroupIdx
+        rRef = hypot(thumbX - ox, thumbY - oy)
         snd?.close()
         haptic()
     }
@@ -394,7 +403,7 @@ class RadialMenuView(context: Context) : View(context) {
         groupList = h.groups()
         if (groupList.isEmpty()) return
         val target = groupList.indices.firstOrNull { h.appsIn(groupList[it]).isNotEmpty() } ?: 0
-        val rMid = (gIn + gOut) / 2f
+        val rMid = hypot(ox - bx, oy - by) // le pouce reste à ce rayon pour choisir un groupe
         val thFirst = itemAngle(0)
         val thTarget = itemAngle(target)
         val thLast = itemAngle(groupList.size - 1)
@@ -403,10 +412,10 @@ class RadialMenuView(context: Context) : View(context) {
             Kf(1300f, bx, by, "Glissez pour choisir un groupe"),
             Kf(2200f, px(thFirst, rMid), py(thFirst, rMid), "Glissez pour choisir un groupe"),
             Kf(3000f, px(thLast, rMid), py(thLast, rMid), "Glissez pour choisir un groupe"),
-            Kf(3800f, px(thTarget, rMid), py(thTarget, rMid), "Poussez vers le bord :\nle groupe s'ouvre"),
+            Kf(3800f, px(thTarget, rMid), py(thTarget, rMid), "Glissez vers l'extérieur :\nle groupe s'ouvre"),
             Kf(4700f, px(thTarget, rApps), py(thTarget, rApps), "Glissez le long du grand arc\npour choisir l'appli"),
             Kf(6100f, px(APPS_CENTER + 8f, rApps), py(APPS_CENTER + 8f, rApps), "Relâchez pour lancer l'appli"),
-            Kf(7200f, px(APPS_CENTER + 8f, rApps), py(APPS_CENTER + 8f, rApps), "Revenez vers l'intérieur\npour refermer le groupe"),
+            Kf(7200f, px(APPS_CENTER + 8f, rApps), py(APPS_CENTER + 8f, rApps), "Glissez vers l'intérieur\npour refermer le groupe"),
             Kf(8200f, px(APPS_CENTER, rMid), py(APPS_CENTER, rMid), "Le dernier segment ⚙\nouvre les réglages"),
             Kf(9400f, bx, by, "")
         )
