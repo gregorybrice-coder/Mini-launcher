@@ -345,22 +345,23 @@ class SettingsActivity : Activity() {
     private inner class ReachPreview(ctx: android.content.Context) : View(ctx) {
         private val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
         private val r = android.graphics.RectF()
+        private fun fdp(v: Float) = v * resources.displayMetrics.density
         override fun onDraw(c: android.graphics.Canvas) {
             val dm = resources.displayMetrics
             val sw = dm.widthPixels / dm.density
             val sh = dm.heightPixels / dm.density
-            val scale = minOf(width / sw, (height - dp(8f)) / sh)
+            val scale = minOf(width / sw, (height - fdp(8f)) / sh)
             val w = sw * scale
             val h = sh * scale
-            val left = width - w - dp(4f)
-            val top = dp(4f)
+            val left = width - w - fdp(4f)
+            val top = fdp(4f)
             val ox = left + w
             val oy = top + h
             p.style = android.graphics.Paint.Style.FILL
             p.color = Color.parseColor("#0C0C0C")
             c.drawRect(left, top, ox, oy, p)
             p.style = android.graphics.Paint.Style.STROKE
-            p.strokeWidth = dp(1.5f)
+            p.strokeWidth = fdp(1.5f)
             p.color = Color.parseColor("#4A4A4A")
             c.drawRect(left, top, ox, oy, p)
 
@@ -388,20 +389,20 @@ class SettingsActivity : Activity() {
             // arc des applis
             p.color = Color.WHITE
             p.alpha = 160
-            p.strokeWidth = dp(1.2f)
+            p.strokeWidth = fdp(1.2f)
             val ra = rApps * scale
             r.set(ox - ra, oy - ra, ox + ra, oy + ra)
             c.drawArc(r, 180f, 90f, false, p)
             p.style = android.graphics.Paint.Style.FILL
             for (k in 0 until 5) {
                 val a = Math.toRadians((100.0 + (170.0 - 100.0) * k / 4))
-                c.drawCircle(ox + ra * Math.cos(a).toFloat(), oy - ra * Math.sin(a).toFloat(), dp(4f), p)
+                c.drawCircle(ox + ra * Math.cos(a).toFloat(), oy - ra * Math.sin(a).toFloat(), fdp(4f), p)
             }
             c.restore()
             // pouce
             p.color = Color.parseColor("#7CC4FF")
             p.alpha = 255
-            c.drawCircle(ox - mr * scale, oy - mb * scale, dp(8f), p)
+            c.drawCircle(ox - mr * scale, oy - mb * scale, fdp(8f), p)
         }
     }
 }
