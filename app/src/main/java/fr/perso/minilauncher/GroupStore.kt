@@ -200,6 +200,45 @@ class GroupStore(ctx: Context) {
         get() = sp.getBoolean("replay_demo", false)
         set(v) { sp.edit().putBoolean("replay_demo", v).apply() }
 
+    /** Tous les réglages (groupes, couleurs, rangement, favoris, position...) en un seul texte JSON. */
+    fun exportJson(): String {
+        val o = JSONObject()
+        o.put("format", "minilauncher-1")
+        val d = JSONObject()
+        for ((k, v) in sp.all) {
+            when (v) {
+                is String -> d.put(k, JSONObject().put("t", "s").put("v", v))
+                is Boolean -> d.put(k, JSONObject().put("t", "b").put("v", v))
+                is Int -> d.put(k, JSONObject().put("t", "i").put("v", v))
+            }
+        }
+        o.put("data", d)
+        return o.toString(2)
+    }
+
+    /** Restaure les réglages exportés ; renvoie faux si le texte n'est pas valide. */
+    fun importJson(text: String): Boolean {
+        return try {
+            val o = JSONObject(text)
+            if (o.optString("format") != "minilauncher-1") return false
+            val d = o.getJSONObject("data")
+            val e = sp.edit().clear()
+            for (k in d.keys()) {
+                val item = d.getJSONObject(k)
+                when (item.getString("t")) {
+                    "s" -> e.putString(k, item.getString("v"))
+                    "b" -> e.putBoolean(k, item.getBoolean("v"))
+                    "i" -> e.putInt(k, item.getInt("v"))
+                }
+            }
+            e.apply()
+            overridesCache = null
+            true
+        } catch (ex: Exception) {
+            false
+        }
+    }
+
     private fun readList(s: String): List<String> {
         val a = JSONArray(s)
         return (0 until a.length()).map { a.getString(it) }

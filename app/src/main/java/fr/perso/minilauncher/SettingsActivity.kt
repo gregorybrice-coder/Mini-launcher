@@ -24,6 +24,9 @@ class SettingsActivity : Activity() {
     private val store get() = app.store
     private val repo get() = app.repo
 
+    private val REQ_EXPORT = 41
+    private val REQ_IMPORT = 42
+
     private lateinit var content: LinearLayout
 
     private fun dp(v: Float) = (v * resources.displayMetrics.density).toInt()
@@ -72,6 +75,22 @@ class SettingsActivity : Activity() {
         content.addView(title("SONS ET VIBRATIONS"))
         content.addView(toggle("Sons du menu radial", store.soundOn) { store.soundOn = it })
         content.addView(toggle("Vibrations légères", store.hapticOn) { store.hapticOn = it })
+
+        // --- sauvegarde ---
+        content.addView(title("SAUVEGARDE DES RÉGLAGES (survit à la désinstallation)"))
+        content.addView(smallButton("Exporter mes réglages dans un fichier") {
+            val i = Intent(Intent.ACTION_CREATE_DOCUMENT)
+            i.addCategory(Intent.CATEGORY_OPENABLE)
+            i.type = "application/json"
+            i.putExtra(Intent.EXTRA_TITLE, "minilauncher-reglages.json")
+            startActivityForResult(i, REQ_EXPORT)
+        })
+        content.addView(smallButton("Importer mes réglages depuis un fichier") {
+            val i = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            i.addCategory(Intent.CATEGORY_OPENABLE)
+            i.type = "*/*"
+            startActivityForResult(i, REQ_IMPORT)
+        })
 
         // --- position du menu ---
         content.addView(title("POSITION DU MENU RADIAL (pour que le pouce reste détendu)"))
@@ -180,6 +199,26 @@ class SettingsActivity : Activity() {
         box.addView(t)
         box.addView(sb)
         return box
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        val uri = data?.data
+        if (resultCode != RESULT_OK || uri == null) return
+        try {
+            if (requestCode == REQ_EXPORT) {
+                contentResolver.openOutputStream(uri, "wt")?.use { it.write(store.exportJson().toByteArray()) }
+                android.widget.Toast.makeText(this, "Réglages exportés", android.widget.Toast.LENGTH_LONG).show()
+            } else if (requestCode == REQ_IMPORT) {
+                val txt = contentResolver.openInputStream(uri)?.use { String(it.readBytes()) } ?: ""
+                val ok = store.importJson(txt)
+                android.widget.Toast.makeText(this, if (ok) "Réglages restaurés" else "Fichier non valide", android.widget.Toast.LENGTH_LONG).show()
+                build()
+            }
+        } catch (e: Exception) {
+            android.widget.Toast.makeText(this, "Échec : ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun toggle(label: String, value: Boolean, onChange: (Boolean) -> Unit): View {
