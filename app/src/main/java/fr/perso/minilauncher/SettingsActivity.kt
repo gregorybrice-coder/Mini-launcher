@@ -103,6 +103,13 @@ class SettingsActivity : Activity() {
         content.addView(slider("Rayon des groupes (écart avec le pouce)", 0, 140, store.menuGap) { store.menuGap = it; prev.invalidate() })
         content.addView(slider("Rayon des applis (écart avec les groupes)", 20, 140, store.appsGap) { store.appsGap = it; prev.invalidate() })
 
+        content.addView(slider("Retour vers les groupes : le pouce doit reculer de", 30, 200, store.backDistance) { store.backDistance = it })
+        val bh = TextView(this)
+        bh.text = "Plus la valeur est grande, plus il faut ramener le pouce vers le bas de l'écran avant que les groupes réapparaissent."
+        bh.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        bh.setTextColor(Color.parseColor("#A0A0A0"))
+        content.addView(bh)
+
         // --- fond d'écran ---
         content.addView(title("FOND D'ÉCRAN (monochrome, sobre)"))
         val sw = LinearLayout(this)

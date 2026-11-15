@@ -200,6 +200,11 @@ class GroupStore(ctx: Context) {
         get() = sp.getInt("menu_gap", 26)
         set(v) { sp.edit().putInt("menu_gap", v).apply() }
 
+    /** Distance (dp) dont le pouce doit reculer vers le bas/l'intérieur pour refermer un groupe. */
+    var backDistance: Int
+        get() = sp.getInt("back_distance", 80)
+        set(v) { sp.edit().putInt("back_distance", v).apply() }
+
     /** Distance entre la bande des groupes et l'arc des applis (dp). */
     var appsGap: Int
         get() = sp.getInt("apps_gap", 52)

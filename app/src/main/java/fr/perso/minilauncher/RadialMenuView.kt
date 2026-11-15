@@ -48,6 +48,7 @@ class RadialMenuView(context: Context) : View(context) {
         fun menuMarginBottom(): Int
         fun menuGap(): Int
         fun appsGap(): Int
+        fun backDistance(): Int
     }
 
     private enum class Mode { IDLE, GROUPS, APPS }
@@ -276,7 +277,7 @@ class RadialMenuView(context: Context) : View(context) {
         } else if (mode == Mode.APPS) {
             rRef = max(rRef, r)
             // glissement vers l'intérieur : le groupe se referme
-            if (rRef - r > dp(42f)) closeGroup() else updateApps(th)
+            if (rRef - r > dp((host?.backDistance() ?: 80).toFloat())) closeGroup() else updateApps(th)
         }
         invalidate()
     }

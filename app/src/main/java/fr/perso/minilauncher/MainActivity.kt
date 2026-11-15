@@ -355,6 +355,7 @@ class MainActivity : Activity(), RadialMenuView.Host {
     override fun menuMarginBottom(): Int = store.menuMarginBottom
     override fun menuGap(): Int = store.menuGap
     override fun appsGap(): Int = store.appsGap
+    override fun backDistance(): Int = store.backDistance
 
     override fun groupColor(group: String): Int = store.colorOf(group)
 
