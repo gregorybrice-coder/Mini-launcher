@@ -73,29 +73,62 @@ class SettingsActivity : Activity() {
         content.addView(toggle("Vibrations légères", store.hapticOn) { store.hapticOn = it })
 
         // --- groupes ---
-        content.addView(title("GROUPES (${store.groups().size} sur ${GroupStore.MAX_GROUPS})"))
-        for (g in store.groups()) {
+        content.addView(title("GROUPES DU MENU RADIAL (${store.groups().size} sur ${GroupStore.MAX_GROUPS})"))
+        val hint = TextView(this)
+        hint.text = "Touchez la pastille pour changer la couleur. ▲ ▼ pour réorganiser (le premier est en haut du menu)."
+        hint.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+        hint.setTextColor(Color.parseColor("#A0A0A0"))
+        content.addView(hint)
+        val gs = store.groups()
+        for ((i, g) in gs.withIndex()) {
             val row = LinearLayout(this)
             row.orientation = LinearLayout.HORIZONTAL
             row.gravity = Gravity.CENTER_VERTICAL
+            row.setPadding(0, dp(4f), 0, dp(4f))
+
+            val dot = View(this)
+            val shape = android.graphics.drawable.GradientDrawable()
+            shape.shape = android.graphics.drawable.GradientDrawable.OVAL
+            shape.setColor(store.colorOf(g))
+            dot.background = shape
+            dot.setOnClickListener { store.cycleColor(g); build() }
+            row.addView(dot, LinearLayout.LayoutParams(dp(32f), dp(32f)).also { it.rightMargin = dp(12f) })
+
             val name = TextView(this)
             name.text = g
             name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             name.setTextColor(Color.parseColor("#F2F2F2"))
+            name.setOnClickListener { askName("Renommer « $g »", g) { n -> store.renameGroup(g, n) } }
             row.addView(name, LinearLayout.LayoutParams(0, -2, 1f))
-            row.addView(smallButton("Renommer") { askName("Renommer « $g »", g) { n -> store.renameGroup(g, n) } })
-            row.addView(smallButton("Supprimer") {
-                store.deleteGroup(g)
-                build()
-            })
+
+            val up = smallButton("▲") { store.moveGroup(g, -1); build() }
+            up.isEnabled = i > 0
+            val down = smallButton("▼") { store.moveGroup(g, 1); build() }
+            down.isEnabled = i < gs.size - 1
+            row.addView(up, LinearLayout.LayoutParams(dp(48f), dp(44f)))
+            row.addView(down, LinearLayout.LayoutParams(dp(48f), dp(44f)))
+            row.addView(smallButton("✎") { askName("Renommer « $g »", g) { n -> store.renameGroup(g, n) } },
+                LinearLayout.LayoutParams(dp(48f), dp(44f)))
+            val del = smallButton("✕") { confirmDelete(g) }
+            del.isEnabled = gs.size > 1
+            row.addView(del, LinearLayout.LayoutParams(dp(48f), dp(44f)))
             content.addView(row)
         }
-        content.addView(smallButton("+ Nouveau groupe") {
-            askName("Nom du groupe", "") { n -> store.addGroup(n) }
-        })
+        val add = smallButton("+ Nouveau groupe") {
+            if (store.groups().size >= GroupStore.MAX_GROUPS) {
+                android.widget.Toast.makeText(this, "${GroupStore.MAX_GROUPS} groupes maximum", android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                askName("Nom du groupe", "") { n -> store.addGroup(n) }
+            }
+        }
+        content.addView(add)
         content.addView(smallButton("Rétablir le rangement par défaut") {
             store.resetAll()
             build()
+        })
+        content.addView(smallButton("Revoir la démonstration du geste") {
+            store.replayDemo = true
+            finish()
         })
 
         // --- applis ---
@@ -147,6 +180,15 @@ class SettingsActivity : Activity() {
                 apply(input.text.toString())
                 build()
             }
+            .setNegativeButton("Annuler", null)
+            .show()
+    }
+
+    private fun confirmDelete(g: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Supprimer « $g » ?")
+            .setMessage("Ses applis seront rangées dans le premier groupe restant.")
+            .setPositiveButton("Supprimer") { _, _ -> store.deleteGroup(g); build() }
             .setNegativeButton("Annuler", null)
             .show()
     }

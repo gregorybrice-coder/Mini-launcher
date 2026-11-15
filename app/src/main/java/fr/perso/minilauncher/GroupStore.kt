@@ -10,7 +10,19 @@ class GroupStore(ctx: Context) {
     private var overridesCache: MutableMap<String, String>? = null
 
     companion object {
-        const val MAX_GROUPS = 5
+        const val MAX_GROUPS = 6
+
+        /** Couleurs proposées pour les groupes (vives, lisibles sur fond noir). */
+        val PALETTE: List<Int> = listOf(
+            0xFF29B6F6.toInt(), // bleu
+            0xFFFF7043.toInt(), // orange
+            0xFF66BB6A.toInt(), // vert
+            0xFFAB47BC.toInt(), // violet
+            0xFFFFCA28.toInt(), // jaune
+            0xFFEC407A.toInt(), // rose
+            0xFF26C6DA.toInt(), // turquoise
+            0xFFD4E157.toInt()  // citron
+        )
     }
 
     // ---- groupes ----
@@ -27,7 +39,12 @@ class GroupStore(ctx: Context) {
         val n = name.trim()
         val g = groups()
         if (n.isEmpty() || g.size >= MAX_GROUPS || g.contains(n)) return false
+        val used = g.map { colorIndex(it) }.toSet()
+        val free = PALETTE.indices.firstOrNull { it !in used } ?: (g.size % PALETTE.size)
         saveGroups(g + n)
+        val cm = colorMap()
+        cm[n] = free
+        saveColors(cm)
         return true
     }
 
@@ -35,7 +52,12 @@ class GroupStore(ctx: Context) {
         val n = new.trim()
         val g = groups()
         if (n.isEmpty() || (n != old && g.contains(n))) return false
+        val idx = colorIndex(old)
         saveGroups(g.map { if (it == old) n else it })
+        val cm = colorMap()
+        cm.remove(old)
+        cm[n] = idx
+        saveColors(cm)
         val ov = overrides()
         for (k in ov.keys.toList()) if (ov[k] == old) ov[k] = n
         saveOverrides(ov)
@@ -51,8 +73,49 @@ class GroupStore(ctx: Context) {
         saveOverrides(ov)
     }
 
+    /** Déplace un groupe vers le haut (-1) ou le bas (+1) dans la liste. */
+    fun moveGroup(name: String, delta: Int) {
+        val g = groups().toMutableList()
+        val i = g.indexOf(name)
+        val j = i + delta
+        if (i < 0 || j < 0 || j >= g.size) return
+        g.removeAt(i)
+        g.add(j, name)
+        saveGroups(g)
+    }
+
+    // ---- couleurs ----
+    private fun colorMap(): MutableMap<String, Int> {
+        val map = HashMap<String, Int>()
+        val s = sp.getString("colors", null) ?: return map
+        val o = JSONObject(s)
+        for (k in o.keys()) map[k] = o.getInt(k)
+        return map
+    }
+
+    private fun saveColors(m: Map<String, Int>) {
+        val o = JSONObject()
+        for ((k, v) in m) o.put(k, v)
+        sp.edit().putString("colors", o.toString()).apply()
+    }
+
+    /** Index de couleur du groupe : choisi par l'utilisateur, sinon selon sa position. */
+    fun colorIndex(name: String): Int {
+        val saved = colorMap()[name]
+        if (saved != null) return Math.floorMod(saved, PALETTE.size)
+        return Math.floorMod(groups().indexOf(name).coerceAtLeast(0), PALETTE.size)
+    }
+
+    fun colorOf(name: String): Int = PALETTE[colorIndex(name)]
+
+    fun cycleColor(name: String) {
+        val m = colorMap()
+        m[name] = (colorIndex(name) + 1) % PALETTE.size
+        saveColors(m)
+    }
+
     fun resetAll() {
-        sp.edit().remove("groups").remove("overrides").apply()
+        sp.edit().remove("groups").remove("overrides").remove("colors").apply()
         overridesCache = null
     }
 
@@ -122,6 +185,11 @@ class GroupStore(ctx: Context) {
     var hapticOn: Boolean
         get() = sp.getBoolean("haptic", true)
         set(v) { sp.edit().putBoolean("haptic", v).apply() }
+
+    /** Demande de rejouer l'animation de démonstration à la prochaine arrivée sur l'accueil. */
+    var replayDemo: Boolean
+        get() = sp.getBoolean("replay_demo", false)
+        set(v) { sp.edit().putBoolean("replay_demo", v).apply() }
 
     private fun readList(s: String): List<String> {
         val a = JSONArray(s)

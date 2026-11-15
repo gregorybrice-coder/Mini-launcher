@@ -28,6 +28,11 @@ import android.widget.TextView
 
 class MainActivity : Activity(), RadialMenuView.Host {
 
+    companion object {
+        /** La démonstration du geste est jouée à chaque démarrage de l'appli. */
+        private var demoShown = false
+    }
+
     private val app get() = application as LauncherApp
     private val store get() = app.store
     private val repo get() = app.repo
@@ -174,6 +179,12 @@ class MainActivity : Activity(), RadialMenuView.Host {
         super.onResume()
         sounds.enabled = store.soundOn
         radial.hapticEnabled = store.hapticOn
+        radial.refresh()
+        if (!demoShown || store.replayDemo) {
+            demoShown = true
+            store.replayDemo = false
+            radial.postDelayed({ radial.playDemo() }, 700)
+        }
         refreshFavorites()
     }
 
@@ -200,11 +211,8 @@ class MainActivity : Activity(), RadialMenuView.Host {
     private fun refreshFavorites() {
         favorites.removeAllViews()
         val all = repo.apps
-        val list: List<AppEntry> = if (store.hasFavorites()) {
-            store.favorites().mapNotNull { k -> all.firstOrNull { it.key == k } }
-        } else {
-            all.filter { store.groupOf(it) == Categorizer.COMM }.take(4)
-        }
+        // aucun favori par défaut : l'accueil reste vide tant que l'utilisateur n'a rien épinglé
+        val list: List<AppEntry> = store.favorites().mapNotNull { k -> all.firstOrNull { it.key == k } }
         for (a in list) {
             val tv = TextView(this)
             tv.text = a.label
@@ -257,6 +265,12 @@ class MainActivity : Activity(), RadialMenuView.Host {
     override fun groups(): List<String> = store.groups()
 
     override fun appsIn(group: String): List<AppEntry> = store.appsIn(group, repo.apps)
+
+    override fun groupColor(group: String): Int = store.colorOf(group)
+
+    override fun openSettings() {
+        startActivity(Intent(this, SettingsActivity::class.java))
+    }
 
     override fun launch(app: AppEntry) {
         store.pushRecent(app.key)
