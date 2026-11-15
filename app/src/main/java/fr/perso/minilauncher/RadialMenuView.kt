@@ -81,8 +81,8 @@ class RadialMenuView(context: Context) : View(context) {
 
     private val START = 90f   // le long du bord droit
     private val END = 180f    // le long du bord bas
-    private val SLOT = 15f
-    private val APPS_CENTER = 135f
+    private var SLOT = 13f
+    private var APPS_CENTER = 135f
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
@@ -97,10 +97,20 @@ class RadialMenuView(context: Context) : View(context) {
         val mb = host?.menuMarginBottom() ?: 200
         bx = width - dp(mr.toFloat())
         by = height - dp(mb.toFloat())
-        val rMax = min(width, height) - dp(12f)
-        rApps = rMax - dp(32f)
-        gOut = rApps - dp(66f)
-        gIn = max(dp(80f), gOut - dp(160f))
+        // les segments de groupes commencent au-delà du pouce : il reste dans la zone libre du centre,
+        // loin des traits de séparation ; le menu s'agrandit en conséquence
+        val thumbR = hypot(ox - bx, oy - by)
+        gIn = max(dp(80f), thumbR + dp(26f))
+        gOut = gIn + dp(100f)
+        rApps = (gOut + dp(64f)).coerceAtMost(height - dp(110f))
+        gOut = min(gOut, rApps - dp(56f))
+        // l'arc des applis doit rester dans l'écran : on limite l'angle côté gauche
+        val ratio = ((width - dp(36f)) / rApps).coerceIn(0.2f, 1f)
+        val aMax = 180f - Math.toDegrees(Math.acos(ratio.toDouble())).toFloat()
+        val aMin = 100f
+        val hi = min(aMax, 172f)
+        APPS_CENTER = (aMin + hi) / 2f
+        SLOT = ((hi - aMin) / 5f).coerceIn(9f, 15f)
     }
 
     /** À appeler quand les groupes, leurs couleurs ou la position du bouton ont pu changer. */
