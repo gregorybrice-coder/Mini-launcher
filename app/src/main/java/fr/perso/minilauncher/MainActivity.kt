@@ -170,7 +170,19 @@ class MainActivity : Activity(), RadialMenuView.Host {
         registerReceiver(packageReceiver, f)
     }
 
+    private var swallowTouch = false
+
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        // un tapotement n'importe où coupe la démonstration et rend la main à l'utilisateur
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN && radial.isDemoPlaying) {
+            radial.stopDemo()
+            swallowTouch = true
+            return true
+        }
+        if (swallowTouch) {
+            if (ev.actionMasked == MotionEvent.ACTION_UP || ev.actionMasked == MotionEvent.ACTION_CANCEL) swallowTouch = false
+            return true
+        }
         gestures.onTouchEvent(ev)
         return super.dispatchTouchEvent(ev)
     }

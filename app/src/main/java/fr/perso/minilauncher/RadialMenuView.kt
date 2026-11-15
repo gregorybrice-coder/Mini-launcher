@@ -140,19 +140,21 @@ class RadialMenuView(context: Context) : View(context) {
         invalidate()
     }
 
+    // quart de cercle entre le côté droit (vers le haut) et le bas (vers la gauche) ;
+    // les rayons s'adaptent pour que l'arc des applis atteigne presque le haut et la gauche de l'écran
+    private val ringApps get() = (min(cx, cy) - dp(34f)).coerceIn(dp(150f), dp(320f))
     private val sectorIn get() = dp(58f)
-    private val sectorOut get() = dp(118f)
-    private val ringApps get() = dp(170f)
-    private val openRadius get() = dp(128f)
+    private val sectorOut get() = ringApps - dp(52f)
+    private val openRadius get() = sectorOut + dp(10f)
+    private val closeRadius get() = sectorOut - dp(18f)
 
-    // le premier niveau occupe tout le tour sauf le coin sud-est (zone de retour)
-    private val START = 4f
-    private val END = 266f
+    private val START = 90f
+    private val END = 180f
 
-    // éventail des applis : centré sur le groupe ouvert, ramené dans l'écran
-    private var appsCenter = 129f
+    // éventail des applis : tout le quart de cercle
+    private val appsCenter = 135f
+    private val SLOT = 19f
     private var armed = false
-    private fun clampCenter(a: Float) = a.coerceIn(78f, 192f)
 
     private fun px(angle: Float, r: Float): Float = cx + r * cos(Math.toRadians(angle.toDouble())).toFloat()
     private fun py(angle: Float, r: Float): Float = cy - r * sin(Math.toRadians(angle.toDouble())).toFloat()
@@ -169,7 +171,7 @@ class RadialMenuView(context: Context) : View(context) {
         return ((t - START) / step()).toInt().coerceIn(0, total() - 1)
     }
 
-    private fun slotAngle(k: Int, m: Int): Float = appsCenter - 17f * (m - 1) / 2f + 17f * k
+    private fun slotAngle(k: Int, m: Int): Float = appsCenter - SLOT * (m - 1) / 2f + SLOT * k
 
     private fun colorOfIdx(i: Int): Int =
         if (i == settingsIdx()) settingsColor else host?.groupColor(groupList[i]) ?: accent
@@ -234,7 +236,7 @@ class RadialMenuView(context: Context) : View(context) {
                 if (r > openRadius && hoverGroup in groupList.indices) openGroup(hoverGroup, th)
             }
         } else if (mode == Mode.APPS) {
-            if (r < dp(100f) || towardCorner) closeGroup() else updateApps(th)
+            if (r < closeRadius || towardCorner) closeGroup() else updateApps(th)
         }
         invalidate()
     }
@@ -243,7 +245,6 @@ class RadialMenuView(context: Context) : View(context) {
         val list = host?.appsIn(groupList[idx]) ?: emptyList()
         if (list.isEmpty()) return
         apps = list
-        appsCenter = clampCenter(itemAngle(idx))
         armed = false
         openGroupIdx = idx
         offset = 0
@@ -273,8 +274,8 @@ class RadialMenuView(context: Context) : View(context) {
         while (d > 180f) d -= 360f
         while (d < -180f) d += 360f
         val t = appsCenter + d
-        if (!armed && t >= a0 - 4f && t <= aLast + 4f) armed = true
-        val slot = ((t - a0) / 17f).roundToInt().coerceIn(0, m - 1)
+        if (!armed && t >= a0 - 14f && t <= aLast + 14f) armed = true
+        val slot = ((t - a0) / SLOT).roundToInt().coerceIn(0, m - 1)
         if (slot != hoverSlot) {
             hoverSlot = slot
             snd?.tick()
@@ -339,15 +340,15 @@ class RadialMenuView(context: Context) : View(context) {
         val target = groupList.indices.firstOrNull { h.appsIn(groupList[it]).isNotEmpty() } ?: 0
         val thFirst = itemAngle(0)
         val thTarget = itemAngle(target)
-        val thApps = clampCenter(thTarget) // milieu de l'éventail des applis
+        val thApps = appsCenter // milieu de l'éventail des applis
         kfs = listOf(
             Kf(0f, thFirst, 0f, "Posez le pouce sur le bouton"),
             Kf(900f, thFirst, 0f, "Poussez vers l'extérieur :\nles groupes apparaissent"),
-            Kf(2100f, thFirst, 105f, "Glissez pour choisir un groupe"),
-            Kf(3000f, thTarget, 105f, "Poussez encore :\nle groupe s'ouvre"),
-            Kf(3900f, thTarget, 168f, "Glissez le long de l'arc\npour choisir l'appli"),
-            Kf(5300f, thApps, 188f, "Relâchez pour lancer l'appli\n(sans lever le pouce avant)"),
-            Kf(6700f, thApps, 188f, "Revenez vers le coin\npour refermer le groupe"),
+            Kf(2100f, thFirst, 100f, "Glissez pour choisir un groupe"),
+            Kf(3000f, thTarget, 100f, "Poussez encore :\nle groupe s'ouvre"),
+            Kf(3900f, thTarget, ringApps / density, "Glissez le long de l'arc\npour choisir l'appli"),
+            Kf(5300f, thApps, ringApps / density, "Relâchez pour lancer l'appli\n(sans lever le pouce avant)"),
+            Kf(6700f, thApps, ringApps / density, "Revenez vers le coin\npour refermer le groupe"),
             Kf(7700f, thApps, 80f, "Relâchez au centre :\ndernière appli utilisée"),
             Kf(8800f, thApps, 0f, "")
         )
@@ -381,7 +382,9 @@ class RadialMenuView(context: Context) : View(context) {
         invalidate()
     }
 
-    private fun stopDemo() {
+    val isDemoPlaying: Boolean get() = demo
+
+    fun stopDemo() {
         if (!demo) return
         demoAnim?.cancel()
         endDemo()
@@ -456,7 +459,7 @@ class RadialMenuView(context: Context) : View(context) {
         stroke.strokeWidth = dp(1.5f)
         stroke.pathEffect = DashPathEffect(floatArrayOf(dp(2f), dp(6f)), 0f)
         arcRect.set(cx - r, cy - r, cx + r, cy + r)
-        c.drawArc(arcRect, -(appsCenter + 48f), 96f, false, stroke)
+        c.drawArc(arcRect, 180f, 90f, false, stroke)
         stroke.pathEffect = null
     }
 
@@ -549,8 +552,8 @@ class RadialMenuView(context: Context) : View(context) {
             drawItem(c, x, y, if (selected) dp(28f) else dp(22f), selected, 255, app.icon, app.label.take(1).uppercase(), color)
         }
         if (n > m) { // applis voisines estompées : la liste continue
-            val aPrev = slotAngle(0, m) - 17f
-            val aNext = slotAngle(m - 1, m) + 17f
+            val aPrev = slotAngle(0, m) - SLOT
+            val aNext = slotAngle(m - 1, m) + SLOT
             val prev = apps[Math.floorMod(offset - 1, n)]
             val next = apps[Math.floorMod(offset + m, n)]
             drawItem(c, px(aPrev, ringApps), py(aPrev, ringApps), dp(22f), false, 80, prev.icon, prev.label.take(1).uppercase(), color)
