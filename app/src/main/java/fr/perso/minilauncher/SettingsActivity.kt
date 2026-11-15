@@ -75,8 +75,8 @@ class SettingsActivity : Activity() {
 
         // --- position du menu ---
         content.addView(title("POSITION DU MENU RADIAL (pour que le pouce reste détendu)"))
-        content.addView(slider("Distance au bord droit", 40, 140, store.menuMarginRight) { store.menuMarginRight = it })
-        content.addView(slider("Distance au bas de l'écran", 40, 320, store.menuMarginBottom) { store.menuMarginBottom = it })
+        content.addView(slider("Distance au bord droit", 40, 260, store.menuMarginRight) { store.menuMarginRight = it })
+        content.addView(slider("Distance au bas de l'écran", 40, 400, store.menuMarginBottom) { store.menuMarginBottom = it })
 
         // --- groupes ---
         content.addView(title("GROUPES DU MENU RADIAL (${store.groups().size} sur ${GroupStore.MAX_GROUPS})"))

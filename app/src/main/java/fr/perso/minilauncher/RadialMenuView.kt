@@ -127,8 +127,8 @@ class RadialMenuView(context: Context) : View(context) {
 
     /** Place le centre du menu selon les marges choisies dans les réglages. */
     private fun placeCenter() {
-        val mr = host?.menuMarginRight() ?: 104
-        val mb = host?.menuMarginBottom() ?: 150
+        val mr = host?.menuMarginRight() ?: 154
+        val mb = host?.menuMarginBottom() ?: 200
         cx = width - dp(mr.toFloat())
         cy = height - dp(mb.toFloat())
     }
@@ -140,13 +140,19 @@ class RadialMenuView(context: Context) : View(context) {
         invalidate()
     }
 
-    private val sectorIn get() = dp(62f)
-    private val sectorOut get() = dp(140f)
-    private val ringApps get() = dp(185f)
-    private val openRadius get() = dp(150f)
+    private val sectorIn get() = dp(58f)
+    private val sectorOut get() = dp(118f)
+    private val ringApps get() = dp(170f)
+    private val openRadius get() = dp(128f)
 
-    private val START = 92f
-    private val END = 178f
+    // le premier niveau occupe tout le tour sauf le coin sud-est (zone de retour)
+    private val START = 4f
+    private val END = 266f
+
+    // éventail des applis : centré sur le groupe ouvert, ramené dans l'écran
+    private var appsCenter = 129f
+    private var armed = false
+    private fun clampCenter(a: Float) = a.coerceIn(78f, 192f)
 
     private fun px(angle: Float, r: Float): Float = cx + r * cos(Math.toRadians(angle.toDouble())).toFloat()
     private fun py(angle: Float, r: Float): Float = cy - r * sin(Math.toRadians(angle.toDouble())).toFloat()
@@ -157,10 +163,13 @@ class RadialMenuView(context: Context) : View(context) {
     private fun itemAngle(i: Int) = START + step() * (i + 0.5f)
     private fun settingsIdx() = groupList.size
 
-    private fun segmentAt(theta: Float): Int =
-        ((theta - START) / step()).toInt().coerceIn(0, total() - 1)
+    private fun segmentAt(theta: Float): Int {
+        var t = theta
+        if (t > (END + 360f) / 2f) t -= 360f // juste sous l'horizontale, côté droit : premier segment
+        return ((t - START) / step()).toInt().coerceIn(0, total() - 1)
+    }
 
-    private fun slotAngle(k: Int, m: Int): Float = 129f - 17f * (m - 1) / 2f + 17f * k
+    private fun slotAngle(k: Int, m: Int): Float = appsCenter - 17f * (m - 1) / 2f + 17f * k
 
     private fun colorOfIdx(i: Int): Int =
         if (i == settingsIdx()) settingsColor else host?.groupColor(groupList[i]) ?: accent
@@ -225,7 +234,7 @@ class RadialMenuView(context: Context) : View(context) {
                 if (r > openRadius && hoverGroup in groupList.indices) openGroup(hoverGroup, th)
             }
         } else if (mode == Mode.APPS) {
-            if (r < dp(115f) || towardCorner) closeGroup() else updateApps(th)
+            if (r < dp(100f) || towardCorner) closeGroup() else updateApps(th)
         }
         invalidate()
     }
@@ -234,6 +243,8 @@ class RadialMenuView(context: Context) : View(context) {
         val list = host?.appsIn(groupList[idx]) ?: emptyList()
         if (list.isEmpty()) return
         apps = list
+        appsCenter = clampCenter(itemAngle(idx))
+        armed = false
         openGroupIdx = idx
         offset = 0
         hoverSlot = 0
@@ -258,7 +269,12 @@ class RadialMenuView(context: Context) : View(context) {
         val m = min(n, 5)
         val a0 = slotAngle(0, m)
         val aLast = slotAngle(m - 1, m)
-        val slot = ((th - a0) / 17f).roundToInt().coerceIn(0, m - 1)
+        var d = th - appsCenter
+        while (d > 180f) d -= 360f
+        while (d < -180f) d += 360f
+        val t = appsCenter + d
+        if (!armed && t >= a0 - 4f && t <= aLast + 4f) armed = true
+        val slot = ((t - a0) / 17f).roundToInt().coerceIn(0, m - 1)
         if (slot != hoverSlot) {
             hoverSlot = slot
             snd?.tick()
@@ -266,9 +282,9 @@ class RadialMenuView(context: Context) : View(context) {
         }
         var dir = 0
         var over = 0f
-        if (n > m) {
-            if (th < a0 - 4f) { dir = -1; over = a0 - th }
-            else if (th > aLast + 4f) { dir = 1; over = th - aLast }
+        if (n > m && armed) {
+            if (t < a0 - 4f) { dir = -1; over = a0 - t }
+            else if (t > aLast + 4f) { dir = 1; over = t - aLast }
         }
         edgeOver = over
         if (dir != edgeDir) {
@@ -286,7 +302,7 @@ class RadialMenuView(context: Context) : View(context) {
     private fun release() {
         val r = hypot(thumbX - cx, thumbY - cy)
         val m = mode
-        val app = if (m == Mode.APPS && apps.isNotEmpty())
+        val app = if (m == Mode.APPS && armed && apps.isNotEmpty())
             apps[Math.floorMod(offset + hoverSlot, apps.size)] else null
         val onSettings = m == Mode.GROUPS && hoverGroup == settingsIdx() && r >= dp(80f)
         reset()
@@ -323,7 +339,7 @@ class RadialMenuView(context: Context) : View(context) {
         val target = groupList.indices.firstOrNull { h.appsIn(groupList[it]).isNotEmpty() } ?: 0
         val thFirst = itemAngle(0)
         val thTarget = itemAngle(target)
-        val thApps = slotAngle(0, 5) + 17f // 3e position, bien dans l'arc
+        val thApps = clampCenter(thTarget) // milieu de l'éventail des applis
         kfs = listOf(
             Kf(0f, thFirst, 0f, "Posez le pouce sur le bouton"),
             Kf(900f, thFirst, 0f, "Poussez vers l'extérieur :\nles groupes apparaissent"),
@@ -440,7 +456,7 @@ class RadialMenuView(context: Context) : View(context) {
         stroke.strokeWidth = dp(1.5f)
         stroke.pathEffect = DashPathEffect(floatArrayOf(dp(2f), dp(6f)), 0f)
         arcRect.set(cx - r, cy - r, cx + r, cy + r)
-        c.drawArc(arcRect, 180f, 90f, false, stroke)
+        c.drawArc(arcRect, -(appsCenter + 48f), 96f, false, stroke)
         stroke.pathEffect = null
     }
 
