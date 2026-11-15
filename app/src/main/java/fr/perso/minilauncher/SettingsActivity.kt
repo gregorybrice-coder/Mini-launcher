@@ -13,6 +13,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 
@@ -71,6 +72,11 @@ class SettingsActivity : Activity() {
         content.addView(title("SONS ET VIBRATIONS"))
         content.addView(toggle("Sons du menu radial", store.soundOn) { store.soundOn = it })
         content.addView(toggle("Vibrations légères", store.hapticOn) { store.hapticOn = it })
+
+        // --- position du menu ---
+        content.addView(title("POSITION DU MENU RADIAL (pour que le pouce reste détendu)"))
+        content.addView(slider("Distance au bord droit", 40, 140, store.menuMarginRight) { store.menuMarginRight = it })
+        content.addView(slider("Distance au bas de l'écran", 40, 320, store.menuMarginBottom) { store.menuMarginBottom = it })
 
         // --- groupes ---
         content.addView(title("GROUPES DU MENU RADIAL (${store.groups().size} sur ${GroupStore.MAX_GROUPS})"))
@@ -143,13 +149,37 @@ class SettingsActivity : Activity() {
             name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             name.setTextColor(Color.parseColor("#F2F2F2"))
             row.addView(name, LinearLayout.LayoutParams(0, -2, 1f))
-            row.addView(smallButton(store.groupOf(a)) { chooseGroup(a) })
+            val gb = smallButton(store.groupOf(a)) { chooseGroup(a) }
+            gb.backgroundTintList = android.content.res.ColorStateList.valueOf(store.colorOf(store.groupOf(a)))
+            gb.setTextColor(Color.WHITE)
+            row.addView(gb)
             row.addView(smallButton(if (favs.contains(a.key)) "★" else "☆") {
                 store.toggleFavorite(a.key)
                 build()
             })
             content.addView(row)
         }
+    }
+
+    private fun slider(label: String, min: Int, max: Int, value: Int, onSet: (Int) -> Unit): View {
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        val t = TextView(this)
+        t.setTextColor(Color.parseColor("#F2F2F2"))
+        t.text = "$label : $value"
+        val sb = SeekBar(this)
+        sb.max = max - min
+        sb.progress = value - min
+        sb.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {
+                t.text = "$label : ${p + min}"
+            }
+            override fun onStartTrackingTouch(s: SeekBar?) {}
+            override fun onStopTrackingTouch(s: SeekBar?) { onSet((s?.progress ?: 0) + min) }
+        })
+        box.addView(t)
+        box.addView(sb)
+        return box
     }
 
     private fun toggle(label: String, value: Boolean, onChange: (Boolean) -> Unit): View {
@@ -195,12 +225,27 @@ class SettingsActivity : Activity() {
 
     private fun chooseGroup(a: AppEntry) {
         val groups = store.groups()
-        AlertDialog.Builder(this)
-            .setTitle(a.label)
-            .setItems(groups.toTypedArray()) { _, which ->
-                store.setGroup(a, groups[which])
+        val current = store.groupOf(a)
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        box.setPadding(dp(20f), dp(8f), dp(20f), dp(8f))
+        val dialog = AlertDialog.Builder(this).setTitle(a.label).setView(box).setNegativeButton("Annuler", null).create()
+        for (g in groups) {
+            val b = Button(this)
+            b.text = (if (g == current) "✓  " else "") + g
+            b.isAllCaps = false
+            b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            b.setTextColor(Color.WHITE)
+            b.backgroundTintList = android.content.res.ColorStateList.valueOf(store.colorOf(g))
+            b.setOnClickListener {
+                store.setGroup(a, g)
+                dialog.dismiss()
                 build()
             }
-            .show()
+            val lp = LinearLayout.LayoutParams(-1, dp(52f))
+            lp.topMargin = dp(6f)
+            box.addView(b, lp)
+        }
+        dialog.show()
     }
 }

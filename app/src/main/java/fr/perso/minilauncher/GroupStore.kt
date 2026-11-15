@@ -186,6 +186,15 @@ class GroupStore(ctx: Context) {
         get() = sp.getBoolean("haptic", true)
         set(v) { sp.edit().putBoolean("haptic", v).apply() }
 
+    /** Position du centre du menu radial : distance (en dp) au bord droit et au bas de l'écran. */
+    var menuMarginRight: Int
+        get() = sp.getInt("menu_right", 104)
+        set(v) { sp.edit().putInt("menu_right", v).apply() }
+
+    var menuMarginBottom: Int
+        get() = sp.getInt("menu_bottom", 150)
+        set(v) { sp.edit().putInt("menu_bottom", v).apply() }
+
     /** Demande de rejouer l'animation de démonstration à la prochaine arrivée sur l'accueil. */
     var replayDemo: Boolean
         get() = sp.getBoolean("replay_demo", false)

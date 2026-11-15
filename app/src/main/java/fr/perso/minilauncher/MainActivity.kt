@@ -266,6 +266,9 @@ class MainActivity : Activity(), RadialMenuView.Host {
 
     override fun appsIn(group: String): List<AppEntry> = store.appsIn(group, repo.apps)
 
+    override fun menuMarginRight(): Int = store.menuMarginRight
+    override fun menuMarginBottom(): Int = store.menuMarginBottom
+
     override fun groupColor(group: String): Int = store.colorOf(group)
 
     override fun openSettings() {

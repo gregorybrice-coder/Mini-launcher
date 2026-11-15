@@ -41,6 +41,8 @@ class RadialMenuView(context: Context) : View(context) {
         fun launch(app: AppEntry)
         fun launchLast()
         fun openSettings()
+        fun menuMarginRight(): Int
+        fun menuMarginBottom(): Int
     }
 
     private enum class Mode { IDLE, GROUPS, APPS }
@@ -120,12 +122,20 @@ class RadialMenuView(context: Context) : View(context) {
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        cx = w - dp(84f)
-        cy = h - dp(84f)
+        placeCenter()
+    }
+
+    /** Place le centre du menu selon les marges choisies dans les réglages. */
+    private fun placeCenter() {
+        val mr = host?.menuMarginRight() ?: 104
+        val mb = host?.menuMarginBottom() ?: 150
+        cx = width - dp(mr.toFloat())
+        cy = height - dp(mb.toFloat())
     }
 
     /** À appeler quand les groupes ou leurs couleurs ont pu changer. */
     fun refresh() {
+        if (!touching && !demo) placeCenter()
         if (mode == Mode.IDLE) groupList = host?.groups() ?: emptyList()
         invalidate()
     }
