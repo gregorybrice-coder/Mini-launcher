@@ -102,8 +102,7 @@ class RadialMenuView(context: Context) : View(context) {
         val thumbR = hypot(ox - bx, oy - by)
         gIn = max(dp(80f), thumbR + dp(26f))
         gOut = gIn + dp(100f)
-        rApps = (gOut + dp(64f)).coerceAtMost(height - dp(110f))
-        gOut = min(gOut, rApps - dp(56f))
+        rApps = (gIn + dp(52f)).coerceAtMost(height - dp(110f)) // les applis prennent la place des groupes
         // l'arc des applis doit rester dans l'écran : on limite l'angle côté gauche
         val ratio = ((width - dp(36f)) / rApps).coerceIn(0.2f, 1f)
         val aMax = 180f - Math.toDegrees(Math.acos(ratio.toDouble())).toFloat()
@@ -175,6 +174,8 @@ class RadialMenuView(context: Context) : View(context) {
     private var openAnim: ValueAnimator? = null
     private var appsT = 1f
     private var appsAnim: ValueAnimator? = null
+    private var retractT = 0f // 0 = groupes déployés, 1 = groupes rétractés (les applis ont pris leur place)
+    private var retractAnim: ValueAnimator? = null
 
     // démonstration
     private var demo = false
@@ -297,6 +298,7 @@ class RadialMenuView(context: Context) : View(context) {
 
     private fun closeGroup() {
         stopEdge()
+        animateRetract(0f)
         mode = Mode.GROUPS
         hoverGroup = openGroupIdx
         rRef = hypot(thumbX - ox, thumbY - oy)
@@ -349,6 +351,8 @@ class RadialMenuView(context: Context) : View(context) {
     }
 
     private fun reset() {
+        retractAnim?.cancel()
+        retractT = 0f
         stopEdge()
         touching = false
         mode = Mode.IDLE
@@ -375,7 +379,19 @@ class RadialMenuView(context: Context) : View(context) {
         }
     }
 
+    private fun animateRetract(to: Float) {
+        retractAnim?.cancel()
+        val from = retractT
+        retractAnim = ValueAnimator.ofFloat(from, to).apply {
+            duration = 300
+            interpolator = android.view.animation.DecelerateInterpolator()
+            addUpdateListener { retractT = it.animatedValue as Float; invalidate() }
+            start()
+        }
+    }
+
     private fun startAppsAnim() {
+        animateRetract(1f)
         appsAnim?.cancel()
         appsT = 0f
         appsAnim = ValueAnimator.ofFloat(0f, 1f).apply {
@@ -533,13 +549,17 @@ class RadialMenuView(context: Context) : View(context) {
             val pc = min(1f, p)
             val color = colorOfIdx(i)
             val selected = if (mode == Mode.APPS) i == openGroupIdx else i == hoverGroup
-            val grow = if (selected && mode == Mode.GROUPS) dp(16f) else 0f
+            val grow = if (selected && mode == Mode.GROUPS && retractT < 0.05f) dp(16f) else 0f
             // jaillit depuis le coin en tournant légèrement
             val rot = (1f - pc) * 28f
             val a1 = START + st * i + 1.2f + rot
             val a2 = START + st * (i + 1) - 1.2f + rot
             val rOut = gIn + (gOut + grow - gIn) * p
-            val path = sector(a1, a2, gIn * pc, rOut)
+            // quand un groupe est ouvert, les segments se rétractent en fine bande près du coin
+            val thin = gIn - dp(4f)
+            val rInD = gIn * pc + ((gIn - dp(14f)) - gIn * pc) * retractT
+            val rOutD = rOut + (thin - rOut) * retractT
+            val path = sector(a1, a2, rInD, rOutD)
             val alpha = when {
                 mode == Mode.APPS -> if (selected) 220 else 55
                 selected -> 255
@@ -554,7 +574,7 @@ class RadialMenuView(context: Context) : View(context) {
             stroke.pathEffect = null
             c.drawPath(path, stroke)
 
-            if (pc < 0.6f) continue
+            if (pc < 0.6f || retractT > 0.25f) continue
             val mid = (a1 + a2) / 2f
             val rl = (gIn * pc + rOut) / 2f
             val lx = px(mid, rl)
@@ -617,7 +637,8 @@ class RadialMenuView(context: Context) : View(context) {
         for (k in 0 until m) {
             val p = stagger(appsT, k, m, 0.4f)
             val a = from + (slotAngle(k, m) - from) * min(1f, p)
-            val r = gOut + (rApps - gOut) * p
+            val r0 = gIn - dp(9f)
+            val r = r0 + (rApps - r0) * p
             val app = apps[Math.floorMod(offset + k, n)]
             val selected = k == hoverSlot && armed
             drawItem(c, px(a, r), py(a, r), if (selected) dp(30f) else dp(24f), selected,
