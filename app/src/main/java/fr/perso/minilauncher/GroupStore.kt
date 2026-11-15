@@ -234,9 +234,9 @@ class GroupStore(ctx: Context) {
         get() = sp.getBoolean("w_battery", false)
         set(v) { sp.edit().putBoolean("w_battery", v).apply() }
 
-    var widgetNotifs: Boolean
-        get() = sp.getBoolean("w_notifs", false)
-        set(v) { sp.edit().putBoolean("w_notifs", v).apply() }
+    var widgetSignal: Boolean
+        get() = sp.getBoolean("w_signal", false)
+        set(v) { sp.edit().putBoolean("w_signal", v).apply() }
 
     /** Demande de rejouer l'animation de démonstration à la prochaine arrivée sur l'accueil. */
     var replayDemo: Boolean

@@ -46,6 +46,7 @@ class MainActivity : Activity(), RadialMenuView.Host {
     private lateinit var radial: RadialMenuView
     private lateinit var wallpaper: WallpaperView
     private lateinit var widgets: LinearLayout
+    private val ticker = android.os.Handler(android.os.Looper.getMainLooper())
     private lateinit var favorites: LinearLayout
     private lateinit var searchPanel: LinearLayout
     private lateinit var searchInput: EditText
@@ -212,9 +213,14 @@ class MainActivity : Activity(), RadialMenuView.Host {
         }
         wallpaper.set(store.wallpaperStyle, store.wallpaperTint)
         wallpaper.setParallax(store.parallaxOn, store.parallaxAmount)
-        NotifService.onChange = { refreshWidgets() }
-        refreshWidgets()
+        ticker.removeCallbacksAndMessages(null)
+        ticker.post(object : Runnable { override fun run() { refreshWidgets(); ticker.postDelayed(this, 5000) } })
         refreshFavorites()
+    }
+
+    override fun onPause() {
+        ticker.removeCallbacksAndMessages(null)
+        super.onPause()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -231,17 +237,12 @@ class MainActivity : Activity(), RadialMenuView.Host {
     override fun onDestroy() {
         unregisterReceiver(packageReceiver)
         repo.onChanged = null
-        NotifService.onChange = null
+        ticker.removeCallbacksAndMessages(null)
         sounds.release()
         super.onDestroy()
     }
 
     // ---------------------------------------------------------------- widgets
-
-    private fun notifAccessGranted(): Boolean {
-        val flat = Settings.Secure.getString(contentResolver, "enabled_notification_listeners") ?: return false
-        return flat.contains(packageName)
-    }
 
     private fun addGauge(label: String, center: String, sub: String, fraction: Float, color: Int, onClick: (() -> Unit)? = null) {
         val g = GaugeView(this)
@@ -283,16 +284,30 @@ class MainActivity : Activity(), RadialMenuView.Host {
                 addGauge(if (charging) "En charge" else "Batterie", "$pct", "%", lvl.toFloat() / scale, col)
             }
         }
-        if (store.widgetNotifs) {
-            if (notifAccessGranted()) {
-                val n = NotifService.count
-                addGauge("Notifs", "$n", if (n == 0) "aucune" else "en attente", if (n > 0) 1f else 0f, accent)
-            } else {
-                addGauge("Notifs", "!", "autoriser", 0f, accent) {
-                    startActivity(Intent(this, SettingsActivity::class.java))
-                }
-            }
+        if (store.widgetSignal) addSignalGauge()
+    }
+
+    /** Qualité du signal mobile : type de réseau (4G/5G) au centre, anneau = niveau de 0 à 4 barres. Sans permission. */
+    private fun addSignalGauge() {
+        val tm = getSystemService(Context.TELEPHONY_SERVICE) as android.telephony.TelephonyManager
+        val ss = try { tm.signalStrength } catch (e: Exception) { null }
+        if (ss == null) { addGauge("Signal", "–", "indisponible", 0f, Color.parseColor("#5A5A5A")); return }
+        val level = ss.level.coerceIn(0, 4)
+        val cells = ss.cellSignalStrengths
+        val tech = when {
+            cells.any { it is android.telephony.CellSignalStrengthNr } -> "5G"
+            cells.any { it is android.telephony.CellSignalStrengthLte } -> "4G"
+            cells.any { it is android.telephony.CellSignalStrengthWcdma } -> "3G"
+            cells.isNotEmpty() -> "2G"
+            else -> "–"
         }
+        val col = when (level) {
+            4, 3 -> Color.parseColor("#66BB6A")
+            2 -> Color.parseColor("#FFCA28")
+            else -> Color.parseColor("#FF7043")
+        }
+        val txt = when (level) { 4 -> "excellent"; 3 -> "bon"; 2 -> "moyen"; 1 -> "faible"; else -> "aucun" }
+        addGauge("Signal", tech, txt, level / 4f, col)
     }
 
     // ---------------------------------------------------------------- favoris

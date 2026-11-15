@@ -154,8 +154,7 @@ class SettingsActivity : Activity() {
         content.addView(title("WIDGETS SOUS L'HEURE"))
         content.addView(toggle("Espace de stockage restant", store.widgetStorage) { store.widgetStorage = it })
         content.addView(toggle("Niveau de batterie", store.widgetBattery) { store.widgetBattery = it })
-        content.addView(toggle("Notifications en attente", store.widgetNotifs) { store.widgetNotifs = it })
-        content.addView(smallButton("Autoriser l'accès aux notifications (pour le compteur)") { askNotifAccess() })
+        content.addView(toggle("Qualité du signal réseau (4G/5G)", store.widgetSignal) { store.widgetSignal = it })
 
         // --- groupes ---
         content.addView(title("GROUPES DU MENU RADIAL (${store.groups().size} sur ${GroupStore.MAX_GROUPS})"))
@@ -311,31 +310,6 @@ class SettingsActivity : Activity() {
                 build()
             }
             .setNegativeButton("Annuler", null)
-            .show()
-    }
-
-    /** Android 13+ bloque cet accès pour les applis installées hors Play Store, tant que « paramètres restreints » n'est pas autorisé. */
-    private fun askNotifAccess() {
-        AlertDialog.Builder(this)
-            .setTitle("Accès aux notifications")
-            .setMessage(
-                "Si Android affiche « pour votre sécurité, accès impossible » ou grise l'option, c'est la protection " +
-                    "des applis installées hors Play Store. Pour la lever :\n\n" +
-                    "1. Ouvrez la fiche de l'appli (bouton ci-dessous)\n" +
-                    "2. Touchez ⋮ en haut à droite\n" +
-                    "3. « Autoriser les paramètres restreints »\n" +
-                    "4. Revenez ici et ouvrez l'accès aux notifications\n\n" +
-                    "Si ⋮ n'apparaît pas, essayez d'abord une fois d'activer l'accès (il sera refusé), puis refaites 1 à 3."
-            )
-            .setPositiveButton("Fiche de l'appli") { _, _ ->
-                startActivity(
-                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:$packageName"))
-                )
-            }
-            .setNeutralButton("Accès aux notifications") { _, _ ->
-                startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-            }
-            .setNegativeButton("Fermer", null)
             .show()
     }
 
