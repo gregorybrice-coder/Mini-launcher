@@ -147,6 +147,9 @@ class SettingsActivity : Activity() {
         }
         content.addView(tints)
 
+        content.addView(toggle("Effet de profondeur : le fond bouge à l'opposé de l'inclinaison", store.parallaxOn) { store.parallaxOn = it })
+        content.addView(slider("Amplitude du mouvement du fond", 4, 30, store.parallaxAmount) { store.parallaxAmount = it })
+
         // --- widgets ---
         content.addView(title("WIDGETS SOUS L'HEURE"))
         content.addView(toggle("Espace de stockage restant", store.widgetStorage) { store.widgetStorage = it })

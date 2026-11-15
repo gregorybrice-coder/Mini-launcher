@@ -200,6 +200,14 @@ class GroupStore(ctx: Context) {
         get() = sp.getInt("menu_gap", 26)
         set(v) { sp.edit().putInt("menu_gap", v).apply() }
 
+    var parallaxOn: Boolean
+        get() = sp.getBoolean("parallax", true)
+        set(v) { sp.edit().putBoolean("parallax", v).apply() }
+
+    var parallaxAmount: Int
+        get() = sp.getInt("parallax_amt", 14)
+        set(v) { sp.edit().putInt("parallax_amt", v).apply() }
+
     /** Distance (dp) dont le pouce doit reculer vers le bas/l'intérieur pour refermer un groupe. */
     var backDistance: Int
         get() = sp.getInt("back_distance", 80)

@@ -211,6 +211,7 @@ class MainActivity : Activity(), RadialMenuView.Host {
             radial.postDelayed({ radial.playDemo() }, 700)
         }
         wallpaper.set(store.wallpaperStyle, store.wallpaperTint)
+        wallpaper.setParallax(store.parallaxOn, store.parallaxAmount)
         NotifService.onChange = { refreshWidgets() }
         refreshWidgets()
         refreshFavorites()
