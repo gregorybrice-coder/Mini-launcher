@@ -243,34 +243,29 @@ class MainActivity : Activity(), RadialMenuView.Host {
         return flat.contains(packageName)
     }
 
-    private fun widgetLine(label: String, value: String, fraction: Float?, onClick: (() -> Unit)? = null) {
-        val row = LinearLayout(this)
-        row.orientation = LinearLayout.VERTICAL
-        row.setPadding(0, dpi(4f), 0, dpi(4f))
-        val t = TextView(this)
-        t.text = "$label  ·  $value"
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-        t.setTextColor(Color.parseColor("#B8B8B8"))
-        row.addView(t)
-        if (fraction != null) {
-            val bar = android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
-            bar.max = 1000
-            bar.progress = (fraction.coerceIn(0f, 1f) * 1000).toInt()
-            bar.progressTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#7CC4FF"))
-            bar.progressBackgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#2A2A2A"))
-            row.addView(bar, LinearLayout.LayoutParams(dpi(180f), dpi(4f)).also { it.topMargin = dpi(4f) })
-        }
-        if (onClick != null) row.setOnClickListener { onClick() }
-        widgets.addView(row)
+    private fun addGauge(label: String, center: String, sub: String, fraction: Float, color: Int, onClick: (() -> Unit)? = null) {
+        val g = GaugeView(this)
+        g.label = label
+        g.centerText = center
+        g.subText = sub
+        g.fraction = fraction
+        g.color = color
+        if (onClick != null) g.setOnClickListener { onClick() }
+        widgets.addView(g, LinearLayout.LayoutParams(-2, -2).also { it.rightMargin = dpi(10f) })
     }
 
     private fun refreshWidgets() {
         widgets.removeAllViews()
+        widgets.orientation = LinearLayout.HORIZONTAL
+        val accent = Color.parseColor("#7CC4FF")
         if (store.widgetStorage) {
             val st = StatFs(Environment.getDataDirectory().path)
             val free = st.availableBytes.toDouble()
             val total = st.totalBytes.toDouble()
-            widgetLine("Stockage", String.format(Locale.getDefault(), "%.1f Go libres", free / 1e9), (1.0 - free / total).toFloat())
+            val go = free / 1e9
+            val txt = if (go >= 100) String.format(Locale.getDefault(), "%.0f", go) else String.format(Locale.getDefault(), "%.1f", go)
+            val frac = (free / total).toFloat()
+            addGauge("Libre", txt, "Go", frac, if (frac < 0.1f) Color.parseColor("#FF7043") else accent)
         }
         if (store.widgetBattery) {
             val i = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
@@ -278,15 +273,23 @@ class MainActivity : Activity(), RadialMenuView.Host {
             val scale = i?.getIntExtra(BatteryManager.EXTRA_SCALE, 100) ?: 100
             val status = i?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
             val charging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
-            if (lvl >= 0) widgetLine("Batterie", "${lvl * 100 / scale} %" + if (charging) " (charge)" else "", lvl.toFloat() / scale)
+            if (lvl >= 0) {
+                val pct = lvl * 100 / scale
+                val col = when {
+                    charging -> Color.parseColor("#66BB6A")
+                    pct <= 15 -> Color.parseColor("#FF7043")
+                    else -> accent
+                }
+                addGauge(if (charging) "En charge" else "Batterie", "$pct", "%", lvl.toFloat() / scale, col)
+            }
         }
         if (store.widgetNotifs) {
             if (notifAccessGranted()) {
                 val n = NotifService.count
-                widgetLine("Notifications", if (n == 0) "aucune en attente" else "$n en attente", null)
+                addGauge("Notifs", "$n", if (n == 0) "aucune" else "en attente", if (n > 0) 1f else 0f, accent)
             } else {
-                widgetLine("Notifications", "touchez pour autoriser l'accès", null) {
-                    startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                addGauge("Notifs", "!", "autoriser", 0f, accent) {
+                    startActivity(Intent(this, SettingsActivity::class.java))
                 }
             }
         }
